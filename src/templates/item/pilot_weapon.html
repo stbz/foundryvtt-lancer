@@ -15,7 +15,7 @@
 					{{#select data.range.0.type}}
 					<option value="range">RANGE</option>
 					<option value="threat">THREAT</option>
-					<option value="throw">THROW</option>
+					<option value="thrown">THROWN</option>
 					<option value="line">LINE</option>
 					<option value="cone">CONE</option>
 					<option value="blast">BLAST</option>
@@ -54,7 +54,7 @@
 				<a class="add-button clickable" data-action="create" style="float: right; margin-right: 1em">+</a>
 			</div>
 			{{#each item.data.tags as |tag key|}}
-			{{{full-tag tag key}}}
+			{{{full-tag tag key "data.tags"}}}
 			{{/each}}
 		</div>
 	</div>

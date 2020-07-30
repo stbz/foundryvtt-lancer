@@ -1,8 +1,10 @@
 
 import { LancerPilotActorData, LancerNPCActorData, LancerDeployableActorData, LancerFrameStatsData, LancerNPCClassStatsData } from '../interfaces'
+import { LANCER } from '../config'
+const lp = LANCER.log_prefix;
 
 export function lancerActorInit(data: any) {
-  console.log(`LANCER | Initializing new ${data.type}`);
+  console.log(`${lp} Initializing new ${data.type}`);
   if (data.type === "pilot" || data.type === "npc") {
     const mech = {
       name: "",
@@ -43,7 +45,18 @@ export function lancerActorInit(data: any) {
       // Default disposition to friendly for pilots and hostile for NPCs
       "token.disposition": data.type === "pilot" ? CONST.TOKEN_DISPOSITIONS.FRIENDLY : CONST.TOKEN_DISPOSITIONS.HOSTILE,  
       "token.name": data.name,                                // Set token name to actor name
-      "token.actorLink": true,                                // Link the token to the Actor
+      "token.actorLink": data.type === "pilot",               // Link the token to the Actor for pilots, but not for NPCs
+    });
+  }
+  else if (data.type === "deployable") {
+    mergeObject(data, {
+      // Initialize image
+      "img": 'systems/lancer/assets/icons/deployable.svg',
+      // Initialize prototype token
+      "token.bar1": {"attribute": "hp"},                      // Default Bar 1 to HP
+      "token.displayName": CONST.TOKEN_DISPLAY_MODES.HOVER,   // Default display name to be always on
+      "token.displayBars": CONST.TOKEN_DISPLAY_MODES.HOVER,   // Default display bars to be always on 
+      "token.name": data.name,                                // Set token name to actor name
     });
   }
 }
@@ -149,7 +162,7 @@ export class LancerActor extends Actor {
     mech.hp.max = newNPCClass.hp[i];
     mech.hp.value = mech.hp.max;
     mech.heat.max = newNPCClass.heatcap[i];
-    mech.heat.value = mech.heat.max;
+    mech.heat.value = 0;
     if(Array.isArray(newNPCClass.structure) && newNPCClass.structure[i]) {
       mech.structure.max = newNPCClass.structure[i];
       mech.structure.value = mech.structure.max;

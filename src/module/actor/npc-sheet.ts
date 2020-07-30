@@ -2,6 +2,8 @@ import { LancerNPCSheetData, LancerNPCClassStatsData, LancerNPCData } from '../i
 import { LancerItem, LancerNPCClass, LancerNPCTemplate, LancerNPCFeature } from '../item/lancer-item';
 import { MechType } from '../enums';
 import { LancerActor } from './lancer-actor';
+import { LANCER } from '../config';
+const lp = LANCER.log_prefix;
 
 const entryPrompt = "//:AWAIT_ENTRY>";
 
@@ -59,11 +61,12 @@ export class LancerNPCSheet extends ActorSheet {
       data.data.name = data.actor.name;
     }
 
-    console.log("LANCER | NPC data: ");
+    console.log(`${lp} NPC data: `);
     console.log(data);
     return data;
   }
 
+  /* -------------------------------------------- */
 
   _prepareItems(data: LancerNPCSheetData) {
 
@@ -80,7 +83,6 @@ export class LancerNPCSheet extends ActorSheet {
     else data.npc_class = undefined;
     //TODO Templates, Classes and Features
   }
-
 
   /* -------------------------------------------- */
 
@@ -108,7 +110,7 @@ export class LancerNPCSheet extends ActorSheet {
         const statKey = statInput.name;
         let keySplit = statKey.split('.');
         let title = keySplit[keySplit.length - 1].toUpperCase();
-        console.log(`LANCER | Rolling ${title} check, key ${statKey}`);
+        console.log(`${lp} Rolling ${title} check, key ${statKey}`);
         game.lancer.rollStatMacro(title, statKey, null, true);
       });
 
@@ -121,7 +123,7 @@ export class LancerNPCSheet extends ActorSheet {
         const modifier = parseInt($(ev.currentTarget).find('.roll-modifier').text());
         const title = $(ev.currentTarget).closest('.skill-compact').find('.modifier-name').text();
         //.find('modifier-name').first().text();
-        console.log(`LANCER | Rolling '${title}' trigger (d20 + ${modifier})`);
+        console.log(`${lp} Rolling '${title}' trigger (d20 + ${modifier})`);
 
         game.lancer.rollTriggerMacro(title, modifier, true);
       });
@@ -130,20 +132,23 @@ export class LancerNPCSheet extends ActorSheet {
       let weaponMacro = html.find('.roll-attack');
       weaponMacro.click(ev => {
         ev.stopPropagation();
-        console.log(ev);
+        console.log(`${lp} Weapon macro button click`, ev);
 
         const weaponElement = $(ev.currentTarget).closest('.weapon')[0] as HTMLElement;
-        // Pilot weapon
-        if (weaponElement.className.search("pilot") >= 0) {
-          let weaponId = weaponElement.getAttribute("data-item-id");
-          // TODO: pass weaponId to rollAttackMacro to do the rolling
-          game.lancer.rollAttackMacro(weaponId);
-        }
-        // Mech weapon
-        else {
-          // Is this actually any different than a pilot weapon?
-        }
-      })
+        let weaponId = weaponElement.getAttribute("data-item-id");
+        game.lancer.rollAttackMacro(weaponId, this.actor._id);
+      });
+
+      // Tech rollers
+      let techMacro = html.find('.roll-tech');
+      techMacro.click(ev => {
+        ev.stopPropagation();
+        console.log(`${lp} Tech attack macro button click`, ev);
+
+        const techElement = $(ev.currentTarget).closest('.tech')[0] as HTMLElement;
+        let techId = techElement.getAttribute("data-item-id");
+        game.lancer.rollTechMacro(techId, this.actor._id);
+      });
     }
     if (this.actor.owner) {
       // Item Dragging
@@ -195,11 +200,13 @@ export class LancerNPCSheet extends ActorSheet {
         let actor = this.actor as LancerActor;
         let NPCClassStats: LancerNPCClassStatsData;
         NPCClassStats = (actor.items.find((i: Item) => i.type === "npc_class") as any).data.data.stats;
-        console.log(`LANCER | TIER Swap with ${tier} and ${NPCClassStats}`);
+        console.log(`${lp} TIER Swap with ${tier} and ${NPCClassStats}`);
         actor.swapNPCClassOrTier(NPCClassStats, false, tier);
       });
     }
   }
+
+  /* -------------------------------------------- */
 
   async _onDrop(event) {
     event.preventDefault();
@@ -220,7 +227,7 @@ export class LancerNPCSheet extends ActorSheet {
     // Case 1 - Item is from a Compendium pack
     if (data.pack) {
       item = (await game.packs.get(data.pack).getEntity(data.id)) as Item;
-      console.log("LANCER | Item dropped from compendium: ", item);
+      console.log(`${lp} Item dropped from compendium: `, item);
     }
     // Case 2 - Item is a World entity
     else if (!data.data) {
@@ -228,7 +235,7 @@ export class LancerNPCSheet extends ActorSheet {
       // If item isn't from a Compendium or World entity, 
       // see if super can do something with it.
       if (!item) super._onDrop(event);
-      console.log("LANCER | Item dropped from world: ", item);
+      console.log(`${lp} Item dropped from world: `, item);
     }
     // Logic below this line is executed only with owner or GM permission of a sheet
     if (!actor.owner && !game.user.isGM) {
@@ -238,67 +245,64 @@ export class LancerNPCSheet extends ActorSheet {
 
     if (item) {
       // Swap mech class
-      if (item && item.type === "npc_class") {
+      if (item.type === "npc_class") {
         let newNPCClassStats: LancerNPCClassStatsData;
         // Remove old class
         actor.items.forEach(async (i: LancerItem) => {
           if (i.type === "npc_class") {
-            console.log(`LANCER | Removing ${actor.name}'s old ${i.name} class.`);
+            console.log(`${lp} Removing ${actor.name}'s old ${i.name} class.`);
             await this.actor.deleteOwnedItem(i._id);
           }
         });
         // Add the new class from Compendium pack
         if (data.pack) {
-          const npcClass = await actor.importItemFromCollection(data.pack, data.id) as LancerNPCClass;
-          console.log(`LANCER | Added ${npcClass.name} from ${data.pack} to ${actor.name}.`);
+          const npcClass = await actor.importItemFromCollection(data.pack, data.id) as any;
+          console.log(`${lp} Added ${npcClass.name} from ${data.pack} to ${actor.name}.`);
           newNPCClassStats = npcClass.data.stats;
         }
         // Add the new Class from a World entity
         else {
           await actor.createEmbeddedEntity("OwnedItem", duplicate(item.data));
-          const npcClass = await actor.createOwnedItem(duplicate(item.data)) as LancerNPCClass;
-          console.log(`LANCER | Added ${npcClass.name} from ${data.pack} to ${actor.name}.`);
+          const npcClass = await actor.createOwnedItem(duplicate(item.data)) as any;
+          console.log(`${lp} Added ${npcClass.name} from ${data.pack} to ${actor.name}.`);
           newNPCClassStats = npcClass.data.stats;
         }
         if (newNPCClassStats) {
-          console.log(`LANCER | Swapping Class stats for ${actor.name}`);
+          console.log(`${lp} Swapping Class stats for ${actor.name}`);
           actor.swapNPCClassOrTier(newNPCClassStats, true);
+        }
+      }
+      else if (LANCER.npc_items.includes(item.type)) {
+        if (data.pack) {
+          console.log(`${lp} Copying ${item.name} from ${data.pack} to ${actor.name}.`);
+          const dupData = duplicate(item.data);
+          const newItem = await actor.importItemFromCollection(data.pack, item._id);
+          // Make sure the new item includes all of the data from the original.
+          (dupData as any)._id = newItem._id;
+          actor.updateOwnedItem(dupData);
+          return;
+        }
+        else {
+          console.log(`${lp} Copying ${item.name} to ${actor.name}.`);
+          const dupData = duplicate(item.data);
+          const newItem = await actor.createOwnedItem(dupData);
+          // Make sure the new item includes all of the data from the original.
+          (dupData as any)._id = newItem._id;
+          actor.updateOwnedItem(dupData);
+          return;
         }
       }
       //TODO add basic features to NPC
       //TODO remove basic feature from NPC on Class swap
-      //TODO implement similar logi for Templates
+      //TODO implement similar logic for Templates
+      else if (LANCER.pilot_items.includes(item.type)) {
+        ui.notifications.error(`Cannot add Item of type "${item.type}" to an NPC.`);
+        return;
+      }
 
       return super._onDrop(event);
     }
   }
-
-  /* -------------------------------------------- */
-
-  // async _onClickAttributeControl(event) {
-  //   event.preventDefault();
-  //   const a = event.currentTarget;
-  //   const action = a.dataset.action;
-  //   const attrs = this.object.data.data.attributes;
-  //   const form = this.form;
-
-  //   // Add new attribute
-  //   if ( action === "create" ) {
-  //     const nk = Object.keys(attrs).length + 1;
-  //     let newKey = document.createElement("div");
-  //     newKey.innerHTML = `<input type="text" name="data.attributes.attr${nk}.key" value="attr${nk}"/>`;
-  //     newKey = newKey.children[0];
-  //     form.appendChild(newKey);
-  //     await this._onSubmit(event);
-  //   }
-
-  //   // Remove existing attribute
-  //   else if ( action === "delete" ) {
-  //     const li = a.closest(".attribute");
-  //     li.parentElement.removeChild(li);
-  //     await this._onSubmit(event);
-  //   }
-  // }
 
   /* -------------------------------------------- */
 
@@ -309,8 +313,10 @@ export class LancerNPCSheet extends ActorSheet {
    */
   _updateObject(event: Event | JQuery.Event, formData: any): Promise<any> {
     console.log(formData);
-    // Use the Actor's name for the pilot's callsign
-    formData.name = formData["data.npc.name"];
+    // Copy the NPC name into the Actor data.
+    formData["name"] = formData["data.name"];
+    // Copy the NPC name to the prototype token.
+    formData['token.name'] = formData["data.name"];
 
     let token: any = this.actor.token;
     // Set the prototype token image if the prototype token isn't initialized
